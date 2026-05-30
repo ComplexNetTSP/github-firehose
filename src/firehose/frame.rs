@@ -1,6 +1,7 @@
 use crate::firehose::blocks::Blocks;
+use crate::firehose::deserialize_cid;
 use crate::firehose::ops::RepoOp;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 /// Event type:
 ///    - "#commit": Applying changes to a user's repository.
 ///    - "#handle": Handling a user's repository.
@@ -18,7 +19,7 @@ pub struct CborHeader {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct CommitFrame {
     //pub blobs: Vec<u8>,
 
@@ -32,8 +33,12 @@ pub struct CommitFrame {
     // (indicated by the 'since' revision field in this message).
     // Corresponds to the 'data' field in the repo commit object.
     // NOTE: this field is effectively required for the 'inductive' version of firehose.
-    #[serde(rename = "prevData")]
-    pub prev_data: Option<serde_bytes::ByteBuf>,
+    #[serde(
+        rename = "prevData",
+        default,
+        deserialize_with = "deserialize_cid::deserialize"
+    )]
+    pub prev_data: Option<String>,
 
     // rebase: DEPRECATED -- unused
     pub rebase: bool,

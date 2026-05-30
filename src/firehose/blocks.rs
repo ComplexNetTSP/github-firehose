@@ -1,10 +1,10 @@
 use crate::firehose::car::{cid_prefix_len, read_varint};
 use crate::firehose::record::Record;
-use serde::{Deserialize, Deserializer, de};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use std::io::Cursor;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Serialize, Default)]
 pub struct Blocks(pub Vec<Record>);
 
 impl<'de> Deserialize<'de> for Blocks {
