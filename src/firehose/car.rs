@@ -1,8 +1,8 @@
-/// Low-level CAR format primitives.
-///
-/// CAR (Content Addressable aRchive) is a packaging format used by Bluesky
-/// to bundle repo blocks in firehose commit events. Each block is prefixed
-/// by a varint length and a CID.
+//! Low-level CAR format primitives.
+//!
+//! CAR (Content Addressable aRchive) is a packaging format used by Bluesky
+//! to bundle repo blocks in firehose commit events. Each block is prefixed
+//! by a varint length and a CID.
 
 /// Reads an unsigned variable-length integer (varint) from a cursor.
 ///

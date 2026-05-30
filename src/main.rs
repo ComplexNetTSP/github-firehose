@@ -1,15 +1,34 @@
 mod firehose;
 
+use chrono::{DateTime, Datelike};
 use ciborium::from_reader;
+use clap::Parser;
 use firehose::{CborHeader, CommitFrame};
 use futures::StreamExt;
-use serde_json;
-use std::io::{BufWriter, Write};
-use std::{io::Cursor, time::Duration};
+use std::{
+    io::{BufWriter, Cursor, Write},
+    path::Path,
+    time::Duration,
+};
 use tokio_tungstenite::connect_async;
 
-fn flush_buf(buf: &mut Vec<CommitFrame>) -> Result<(), Box<dyn std::error::Error>> {
-    let file = std::fs::File::create("data.ndjson")?;
+fn flush_buf(
+    buf: &mut Vec<CommitFrame>,
+    output_dir: &str,
+    year: i32,
+    month: i32,
+    day: i32,
+    last_seq: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Ensure output directory exists
+    let file_path = format!(
+        "{}/year={}/month={}/day={}/{}.ndjson",
+        output_dir, year, month, day, last_seq
+    );
+    if let Some(parent) = Path::new(&file_path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = std::fs::File::create(&file_path)?;
     let mut writer = BufWriter::new(file);
     serde_json::to_writer(&mut writer, buf)?;
     for record in buf.iter() {
@@ -17,7 +36,7 @@ fn flush_buf(buf: &mut Vec<CommitFrame>) -> Result<(), Box<dyn std::error::Error
         writer.write_all(b"\n")?;
     }
 
-    println!("Flushing {} frames", buf.len());
+    eprintln!("Flushing frames in file: {}", file_path);
     buf.clear();
     Ok(())
 }
@@ -46,13 +65,30 @@ fn handle_message(data: Vec<u8>, buf: &mut Vec<CommitFrame>) -> anyhow::Result<O
     Ok(Some(seq))
 }
 
+/// bsky-firehose: A Rust client for the Bluesky firehose stream
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Output directory for the flushed frames
+    #[arg(short, long, default_value_t = String::from("./output"))]
+    output_dir: String,
+
+    /// Maximum number of frames to keep in memory before flushing to disk
+    #[arg(short, long, default_value_t = 100000)]
+    max_buf_size: usize,
+
+    /// Optional starting sequence number to resume from
+    #[arg(short, long)]
+    start_seq: Option<u64>,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
     const INIT_BACKOFF: Duration = Duration::from_secs(5);
-    const MAX_BUF_SIZE: usize = 100; // Max number of frames to keep in memory
-    let mut last_seq: Option<u64> = None; // Starting sequence number (can be adjusted to resume from a specific point)
+    let mut last_seq: Option<u64> = args.start_seq; // Starting sequence number (can be adjusted to resume from a specific point)
     let mut backoff = INIT_BACKOFF;
-    let mut buf: Vec<CommitFrame> = Vec::with_capacity(MAX_BUF_SIZE);
+    let mut buf: Vec<CommitFrame> = Vec::with_capacity(args.max_buf_size);
     // Continuously attempt to connect and listen to the firehose, with a backoff strategy on failure
     loop {
         let url = firehose_url(last_seq); // Start from a specific sequence number
@@ -77,9 +113,19 @@ async fn main() -> anyhow::Result<()> {
                     _ => break, // Ignore other message types and errors for simplicity
                 }
                 // If buffer exceeds max size, remove the oldest frame
-                if buf.len() > MAX_BUF_SIZE {
-                    flush_buf(&mut buf)
-                        .unwrap_or_else(|e| eprintln!("Error flushing buffer: {}", e));
+                if buf.len() > args.max_buf_size {
+                    //parse the date of le first message in the buffer
+                    let first_date: &str = buf[0].time.as_ref();
+                    let date = DateTime::parse_from_rfc3339(first_date)?;
+                    flush_buf(
+                        &mut buf,
+                        &args.output_dir,
+                        date.year(),
+                        date.month() as i32,
+                        date.day() as i32,
+                        last_seq.unwrap_or(0),
+                    )
+                    .unwrap_or_else(|e| eprintln!("Error flushing buffer: {}", e));
                 }
             }
         }
@@ -87,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
         // If we reach here, it means the connection was closed or failed.
         // Log the error and wait before retrying.
         //
-        println!("Disconnected. Retrying in {:?}...", backoff);
+        eprintln!("Disconnected. Retrying in {:?}...", backoff);
         tokio::time::sleep(backoff).await;
         // Exponential backoff with a maximum cap
         backoff = (backoff * 2).min(Duration::from_secs(60));

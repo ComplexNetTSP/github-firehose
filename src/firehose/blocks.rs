@@ -17,12 +17,6 @@ impl<'de> Deserialize<'de> for Blocks {
     }
 }
 
-/// Converts raw CID bytes to a base32lower multibase link string.
-/// e.g. &[0x01, 0x71, ...] → "bafyrei..."
-// fn cid_to_link(cid_bytes: &[u8]) -> String {
-//     multibase::encode(multibase::Base::Base32Lower, cid_bytes)
-// }
-
 /// Parses a CAR byte slice into a list of decoded records.
 ///
 /// Skips the CAR header, then iterates over varint-prefixed blocks.
