@@ -9,13 +9,13 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            binary: my-app
+            binary: bsky-firehose
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            binary: my-app.exe
+            binary: bsky-firehose.exe
           - os: macos-latest
             target: x86_64-apple-darwin
-            binary: my-app
+            binary: bsky-firehose
 
 
     runs-on: ${{ matrix.os }}
@@ -44,9 +44,9 @@ jobs:
         shell: bash
         run: |
           cp target/${{ matrix.target }}/release/${{ matrix.binary }} \
-             bsky-firehose-${{ matrix.target }}
+             ${{ matrix.binary }}-${{ matrix.target }}
       
       - name: Upload binary
         uses: softprops/action-gh-release@v2
         with:
-          files: bsky-firehose-${{ matrix.target }}
+          files: ${{ matrix.binary }}-${{ matrix.target }}

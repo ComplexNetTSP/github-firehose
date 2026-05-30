@@ -51,9 +51,6 @@ fn parse_car(car_bytes: &[u8]) -> anyhow::Result<Vec<Record>> {
         //let cid_bytes = &block_data[..cid_len];
         let cbor = &block_data[cid_len..];
 
-        // encode the raw CID bytes as a base32 link string
-        //let cid = cid_to_link(cid_bytes);
-
         if let Ok(record) = ciborium::from_reader::<Record, _>(&mut Cursor::new(cbor)) {
             records.push(record);
         }
