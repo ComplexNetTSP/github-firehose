@@ -37,7 +37,7 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -D warnings
       
-      - run: cargo build --release
+      - run: cargo build --release --target ${{ matrix.target }}
       - run: cargo test
 
       - name: Rename binary
